@@ -85,6 +85,9 @@ app.post('/ktx2', async (req, res) => {
             }
             
             const outputBuffer = await fs.readFile(outputPath);
+
+            console.log('output buffer size', outputBuffer.length);
+
             res.set('Content-Type', 'application/octet-stream');
             res.send(outputBuffer);
           } catch (error) {
