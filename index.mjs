@@ -67,7 +67,7 @@ app.post('/ktx2', async (req, res) => {
         
         // Add quality parameter if valid
         if (isValidQuality) {
-          args.push('-qlevel', quality.toString());
+          args.push('-q', quality.toString());
         }
         
         const child = spawn(basisuPath, args);
