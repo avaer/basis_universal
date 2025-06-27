@@ -56,6 +56,8 @@ app.post('/ktx2', async (req, res) => {
         // Parse quality parameter from query string
         const quality = parseInt(req.query.q, 10);
         const isValidQuality = !isNaN(quality) && quality >= 1 && quality <= 255;
+
+        const flipY = req.query.flipY === '1';
         
         const args = [
           '-ktx2',
@@ -68,6 +70,10 @@ app.post('/ktx2', async (req, res) => {
         // Add quality parameter if valid
         if (isValidQuality) {
           args.push('-q', quality.toString());
+        }
+
+        if (flipY) {
+          args.push('-y_flip');
         }
         
         const child = spawn(basisuPath, args);
