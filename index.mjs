@@ -58,6 +58,7 @@ app.post('/ktx2', async (req, res) => {
         const isValidQuality = !isNaN(quality) && quality >= 1 && quality <= 255;
 
         const flipY = req.query.flipY === '1';
+        const uastc = req.query.uastc === '1';
         
         const args = [
           '-ktx2',
@@ -74,6 +75,10 @@ app.post('/ktx2', async (req, res) => {
 
         if (flipY) {
           args.push('-y_flip');
+        }
+
+        if (uastc) {
+          args.push('-uastc');
         }
         
         const child = spawn(basisuPath, args);
