@@ -80,6 +80,8 @@ app.post('/ktx2', async (req, res) => {
         if (uastc) {
           args.push('-uastc');
         }
+
+        console.log('shelling out to basisu', [basisuPath, ...args]);
         
         const child = spawn(basisuPath, args);
         
