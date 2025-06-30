@@ -59,10 +59,10 @@ app.post('/ktx2', async (req, res) => {
 
         const flipY = req.query.flipY === '1';
         const uastc = req.query.uastc === '1';
+        const mipmaps = req.query.mipmaps === '1';
         
         const args = [
           '-ktx2',
-          '-mipmap',
           inputPath,
           '-output_file',
           outputPath
@@ -79,6 +79,10 @@ app.post('/ktx2', async (req, res) => {
 
         if (uastc) {
           args.push('-uastc');
+        }
+
+        if (mipmaps) {
+          args.push('-mipmap');
         }
 
         console.log('shelling out to basisu', [basisuPath, ...args]);
