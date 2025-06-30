@@ -14,6 +14,9 @@ importers:
       mime-types:
         specifier: ^2.1.35
         version: 2.1.35
+      queue-manager-async:
+        specifier: ^0.0.2
+        version: 0.0.2
 
 packages:
 
@@ -219,6 +222,9 @@ packages:
   qs@6.13.0:
     resolution: {integrity: sha512-+38qI9SOr8tfZ4QmJNplMUxqjbe7LKvvZgWdExBOmd+egZTtjLB67Gu0HRX3u/XOq7UU2Nx6nsjvS16Z9uwfpg==}
     engines: {node: '>=0.6'}
+
+  queue-manager-async@0.0.2:
+    resolution: {integrity: sha512-OCz3MvqAcmfVa6oyRp7KIwd/8Ame2B/hEdm/kWwks4GmUO1qyao4dEdHYnZYCJWHiuUXzMBSN0Nhz+Wi/wNymw==}
 
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
@@ -501,6 +507,8 @@ snapshots:
   qs@6.13.0:
     dependencies:
       side-channel: 1.1.0
+
+  queue-manager-async@0.0.2: {}
 
   range-parser@1.2.1: {}
 
