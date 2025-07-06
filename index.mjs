@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import mime from 'mime-types';
 import { QueueManager } from 'queue-manager-async';
+import filetype from 'magic-bytes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,8 +54,9 @@ app.post('/ktx2', async (req, res) => {
       const tempDir = await fs.mkdtemp(path.join(__dirname, 'temp-'));
       
       // Get the content-type and determine the file extension
-      const contentType = req.get('content-type');
-      const extension = mime.extension(contentType) || 'png'; // fallback to png if unknown
+      // const contentType = req.get('content-type');
+      // const extension = mime.extension(contentType) || 'png'; // fallback to png if unknown
+      const extension = filetype.filetypeextension(imageBuffer)?.[0] || 'png';
       const inputPath = path.join(tempDir, `image.${extension}`);
       const outputPath = path.join(tempDir, 'image.ktx2');
       
