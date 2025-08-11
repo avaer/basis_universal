@@ -3,14 +3,17 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import mime from 'mime-types';
+import { cpus } from 'os';
+// import mime from 'mime-types';
 import { QueueManager } from 'queue-manager-async';
 import filetype from 'magic-bytes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const queueManager = new QueueManager();
+const queueManager = new QueueManager({
+  parallelism: cpus().length,
+});
 
 const app = express();
 const port = process.env.PORT || 3000;
