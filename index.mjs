@@ -55,92 +55,106 @@ app.post('/ktx2', async (req, res) => {
       const imageBuffer = await chunksPromise;
 
       const tempDir = await fs.mkdtemp(path.join(__dirname, 'temp-'));
-      
       // Get the content-type and determine the file extension
       // const contentType = req.get('content-type');
       // const extension = mime.extension(contentType) || 'png'; // fallback to png if unknown
       const extension = filetype.filetypeextension(imageBuffer)?.[0] || 'png';
       const inputPath = path.join(tempDir, `image.${extension}`);
       const outputPath = path.join(tempDir, 'image.ktx2');
-      
-      console.log('got body', imageBuffer.length, 'bytes');
-      await fs.writeFile(inputPath, imageBuffer);
-      
-      const basisuPath = path.join(__dirname, 'bin', 'basisu');
-      
-      // Parse quality parameter from query string
-      const quality = parseInt(req.query.q, 10);
-      const isValidQuality = !isNaN(quality) && quality >= 1 && quality <= 255;
 
-      const flipY = req.query.flipY === '1';
-      const uastc = req.query.uastc === '1';
-      const linear = req.query.linear === '1';
-      const mipmaps = req.query.mipmaps === '1';
-      
-      const args = [
-        '-ktx2',
-        inputPath,
-        '-output_file',
-        outputPath
-      ];
-      
-      // Add quality parameter if valid
-      if (isValidQuality) {
-        args.push('-q', quality.toString());
-      }
-
-      if (flipY) {
-        args.push('-y_flip');
-      }
-
-      if (uastc) {
-        args.push('-uastc');
-      }
-
-      if (mipmaps) {
-        args.push('-mipmap');
-      }
-
-      if (linear) {
-        args.push('-linear');
-      }
-
-      console.log('shelling out to basisu', [basisuPath, ...args]);
-      
-      const child = spawn(basisuPath, args);
-      
-      let stderr = '';
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      child.on('close', async (code) => {
+      const cleanup = async () => {
         try {
-          if (code !== 0) {
-            console.error(`basisu exited with code ${code}: ${stderr}`);
-            return res.status(500).json({ error: 'Compression failed', details: stderr });
-          }
-          
-          const outputBuffer = await fs.readFile(outputPath);
-
-          console.log('output buffer size', outputBuffer.length);
-
-          res.set('Content-Type', 'application/octet-stream');
-          res.send(outputBuffer);
-        } catch (error) {
-          console.error('Error reading output file:', error);
-          res.status(500).json({ error: 'Failed to read compressed file' });
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.error('Failed to cleanup temp directory:', cleanupError);
         }
-      });
-      
-      child.on('error', async (error) => {
-        console.error('Error spawning basisu:', error);
-        res.status(500).json({ error: 'Failed to execute basisu binary' });
-      });
+      };
+
+      try {
+        console.log('got body', imageBuffer.length, 'bytes');
+        await fs.writeFile(inputPath, imageBuffer);
+
+        const basisuPath = path.join(__dirname, 'bin', 'basisu');
+
+        // Parse quality parameter from query string
+        const quality = parseInt(req.query.q, 10);
+        const isValidQuality = !isNaN(quality) && quality >= 1 && quality <= 255;
+
+        const flipY = req.query.flipY === '1';
+        const uastc = req.query.uastc === '1';
+        const linear = req.query.linear === '1';
+        const mipmaps = req.query.mipmaps === '1';
+
+        const args = [
+          '-ktx2',
+          inputPath,
+          '-output_file',
+          outputPath
+        ];
+
+        // Add quality parameter if valid
+        if (isValidQuality) {
+          args.push('-q', quality.toString());
+        }
+
+        if (flipY) {
+          args.push('-y_flip');
+        }
+
+        if (uastc) {
+          args.push('-uastc');
+        }
+
+        if (mipmaps) {
+          args.push('-mipmap');
+        }
+
+        if (linear) {
+          args.push('-linear');
+        }
+
+        console.log('shelling out to basisu', [basisuPath, ...args]);
+
+        const outputBuffer = await new Promise((resolve, reject) => {
+          const child = spawn(basisuPath, args);
+
+          let stderr = '';
+          child.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+
+          child.on('close', (code) => {
+            if (code !== 0) {
+              console.error(`basisu exited with code ${code}: ${stderr}`);
+              reject(new Error(stderr || `basisu exited with code ${code}`));
+              return;
+            }
+            fs.readFile(outputPath).then(resolve).catch(reject);
+          });
+
+          child.on('error', (error) => {
+            console.error('Error spawning basisu:', error);
+            reject(error);
+          });
+        });
+
+        console.log('output buffer size', outputBuffer.length);
+        res.set('Content-Type', 'application/octet-stream');
+        res.send(outputBuffer);
+      } catch (error) {
+        console.error('Error in /ktx2 processing:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Compression failed', details: String(error?.message || error) });
+        }
+      } finally {
+        await cleanup();
+      }
     });
   } catch (error) {
     console.error('Error in /ktx2 endpoint:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
