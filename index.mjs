@@ -58,7 +58,7 @@ app.post('/ktx2', async (req, res) => {
       // Get the content-type and determine the file extension
       // const contentType = req.get('content-type');
       // const extension = mime.extension(contentType) || 'png'; // fallback to png if unknown
-      const extension = filetype.filetypeextension(imageBuffer)?.[0] || 'png';
+      const extension = filetype.filetypeextension(imageBuffer)?.[0] || 'bin';
       const inputPath = path.join(tempDir, `image.${extension}`);
       const outputPath = path.join(tempDir, 'image.ktx2');
 
@@ -74,6 +74,38 @@ app.post('/ktx2', async (req, res) => {
         console.log('got body', imageBuffer.length, 'bytes');
         await fs.writeFile(inputPath, imageBuffer);
 
+        // Determine if the input needs conversion to PNG via ImageMagick's `convert`
+        let workingInputPath = inputPath;
+        const detectedExt = String(extension).toLowerCase();
+        if (detectedExt !== 'png' && detectedExt !== 'jpg' && detectedExt !== 'jpeg') {
+          const convertedPath = path.join(tempDir, 'image.png');
+          console.log('attempting to convert non-png/jpeg input via `convert`');
+          try {
+            await new Promise((resolve, reject) => {
+              const child = spawn('convert', [inputPath, convertedPath]);
+              let stderr = '';
+              child.stderr.on('data', (data) => {
+                stderr += data.toString();
+              });
+              child.on('close', (code) => {
+                if (code !== 0) {
+                  console.warn(`convert exited with code ${code}: ${stderr}`);
+                  reject(new Error(stderr || `convert exited with code ${code}`));
+                  return;
+                }
+                resolve();
+              });
+              child.on('error', (error) => {
+                reject(error);
+              });
+            });
+            workingInputPath = convertedPath;
+            console.log('conversion successful, using', workingInputPath);
+          } catch (convErr) {
+            console.warn('Image conversion via `convert` failed; proceeding with original input:', convErr?.message || convErr);
+          }
+        }
+
         const basisuPath = path.join(__dirname, 'bin', 'basisu');
 
         // Parse quality parameter from query string
@@ -87,7 +119,7 @@ app.post('/ktx2', async (req, res) => {
 
         const args = [
           '-ktx2',
-          inputPath,
+          workingInputPath,
           '-output_file',
           outputPath
         ];
