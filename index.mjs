@@ -7,6 +7,7 @@ import { cpus } from 'os';
 // import mime from 'mime-types';
 import { QueueManager } from 'queue-manager-async';
 import filetype from 'magic-bytes.js';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -74,35 +75,29 @@ app.post('/ktx2', async (req, res) => {
         console.log('got body', imageBuffer.length, 'bytes');
         await fs.writeFile(inputPath, imageBuffer);
 
-        // Determine if the input needs conversion to PNG via ImageMagick's `convert`
+        // Load image with sharp to obtain metadata and optionally convert to PNG
+        let width;
+        let height;
+        const metadata = await sharp(imageBuffer).metadata();
+        width = metadata.width;
+        height = metadata.height;
+
+        // Set headers if metadata is available
+        res.set('X-Width', String(width));
+        res.set('X-Height', String(height));
+
+        // Determine if the input needs conversion to PNG via sharp
         let workingInputPath = inputPath;
         const detectedExt = String(extension).toLowerCase();
         if (detectedExt !== 'png' && detectedExt !== 'jpg' && detectedExt !== 'jpeg') {
           const convertedPath = path.join(tempDir, 'image.png');
-          console.log('attempting to convert non-png/jpeg input via `convert`');
+          console.log('attempting to convert non-png/jpeg input via sharp');
           try {
-            await new Promise((resolve, reject) => {
-              const child = spawn('convert', [inputPath, convertedPath]);
-              let stderr = '';
-              child.stderr.on('data', (data) => {
-                stderr += data.toString();
-              });
-              child.on('close', (code) => {
-                if (code !== 0) {
-                  console.warn(`convert exited with code ${code}: ${stderr}`);
-                  reject(new Error(stderr || `convert exited with code ${code}`));
-                  return;
-                }
-                resolve();
-              });
-              child.on('error', (error) => {
-                reject(error);
-              });
-            });
+            await sharp(imageBuffer).png().toFile(convertedPath);
             workingInputPath = convertedPath;
-            console.log('conversion successful, using', workingInputPath);
+            console.log('sharp conversion successful, using', workingInputPath);
           } catch (convErr) {
-            console.warn('Image conversion via `convert` failed; proceeding with original input:', convErr?.message || convErr);
+            console.warn('Image conversion via sharp failed; proceeding with original input:', convErr?.message || convErr);
           }
         }
 
