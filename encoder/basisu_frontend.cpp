@@ -1480,13 +1480,15 @@ namespace basisu
 
 		if (use_cpu)
 		{
+			// Always cap per-cluster pixels to keep peak memory bounded
+			const uint32_t kMaxPixelsPerCluster = 65536;
 			const uint32_t N = 128;
 			for (uint32_t cluster_index_iter = 0; cluster_index_iter < m_endpoint_clusters.size(); cluster_index_iter += N)
 			{
 				const uint32_t first_index = cluster_index_iter;
 				const uint32_t last_index = minimum<uint32_t>((uint32_t)m_endpoint_clusters.size(), cluster_index_iter + N);
 
-				m_params.m_pJob_pool->add_job([this, first_index, last_index, step] {
+				m_params.m_pJob_pool->add_job([this, first_index, last_index, step, kMaxPixelsPerCluster] {
 
 					for (uint32_t cluster_index = first_index; cluster_index < last_index; cluster_index++)
 					{
@@ -1494,11 +1496,15 @@ namespace basisu
 
 						BASISU_FRONTEND_VERIFY(cluster_indices.size());
 
-						const uint32_t total_pixels = (uint32_t)cluster_indices.size() * 8;
+						const uint32_t cluster_entries = (uint32_t)cluster_indices.size();
+						const uint32_t want_pixels = cluster_entries * 8U;
+						const uint32_t sample_stride = (want_pixels > kMaxPixelsPerCluster) ? ((want_pixels + kMaxPixelsPerCluster - 1) / kMaxPixelsPerCluster) : 1U;
+						const uint32_t sampled_entries = maximum<uint32_t>(1U, (cluster_entries + sample_stride - 1) / sample_stride);
+						const uint32_t total_pixels = sampled_entries * 8U;
 
 						basisu::vector<color_rgba> cluster_pixels(total_pixels);
 
-						for (uint32_t cluster_indices_iter = 0; cluster_indices_iter < cluster_indices.size(); cluster_indices_iter++)
+						for (uint32_t cluster_indices_iter = 0; cluster_indices_iter < cluster_indices.size(); cluster_indices_iter += sample_stride)
 						{
 							const uint32_t block_index = cluster_indices[cluster_indices_iter] >> 1;
 							const uint32_t subblock_index = cluster_indices[cluster_indices_iter] & 1;
@@ -1510,7 +1516,8 @@ namespace basisu
 							for (uint32_t pixel_index = 0; pixel_index < 8; pixel_index++)
 							{
 								const color_rgba& c = pBlock_pixels[g_etc1_pixel_indices[flipped][subblock_index][pixel_index]];
-								cluster_pixels[cluster_indices_iter * 8 + pixel_index] = c;
+								const uint32_t dst = (cluster_indices_iter / sample_stride) * 8 + pixel_index;
+								cluster_pixels[dst] = c;
 							}
 						}
 
@@ -3381,5 +3388,44 @@ namespace basisu
 		save_png(pFilename, img);
 	}
 
+	// Aggressively free/shrink intermediate data structures to reduce resident memory,
+	// without changing outputs. Only used when a memory budget is set.
+void basisu_frontend::trim_memory()
+	{
+		// Keep only the data the backend (already run) and any basic queries need.
+		// Safe to release intermediates used during clustering and OpenCL prep.
+
+		// Release source pixel blocks
+		m_source_blocks.clear();
+
+    // Endpoint clustering auxiliaries not needed post-encode
+		m_endpoint_parent_clusters.clear();
+		m_block_parent_endpoint_cluster.clear();
+		m_endpoint_clusters_within_each_parent_cluster.clear();
+		m_subblock_endpoint_quant_err_vec.clear();
+    m_endpoint_clusters.clear();
+
+		// Selector clustering auxiliaries not needed post-encode
+		m_selector_parent_cluster_block_indices.clear();
+		m_block_parent_selector_cluster.clear();
+		m_selector_clusters_within_each_parent_cluster.clear();
+    m_selector_cluster_block_indices.clear();
+    m_block_selector_cluster_index.clear();
+    m_optimized_cluster_selectors.clear();
+
+		// Intermediary encoded blocks (pre-selector quant) only useful for debug images
+		if (!m_params.m_debug_images)
+			m_orig_encoded_blocks.clear();
+
+    // Per-block endpoint indices no longer needed post-encode
+    m_block_endpoint_clusters_indices.clear();
+
+    // Frontend encoded blocks and best ETC1S blocks are not needed post-backend encode
+    m_encoded_blocks.clear();
+    m_etc1_blocks_etc1s.clear();
+
+    // Release any internal memory in the endpoint clusterizer
+    m_endpoint_clusterizer = vec6F_quantizer();
+	}
 } // namespace basisu
 

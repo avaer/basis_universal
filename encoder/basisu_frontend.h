@@ -114,6 +114,9 @@ namespace basisu
 
 		bool compress();
 
+		// Free or shrink intermediate containers after compression to lower peak RSS.
+		void trim_memory();
+
 		const params &get_params() const { return m_params; }
 
 		const pixel_block &get_source_pixel_block(uint32_t i) const { return m_source_blocks[i]; }

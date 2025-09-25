@@ -2456,6 +2456,10 @@ namespace basisu
 		m_backend.init(&m_frontend, backend_params, m_slice_descs);
 		uint32_t total_packed_bytes = m_backend.encode();
 
+
+		// Always trim frontend memory after encode.
+		m_frontend.trim_memory();
+
 		if (!total_packed_bytes)
 		{
 			error_printf("basis_compressor::encode() failed!\n");
