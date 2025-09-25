@@ -2148,51 +2148,37 @@ namespace basisu
 		debug_printf("generate_selector_clusters\n");
 				
 		typedef tree_vector_quant<vec16F> vec16F_clusterizer;
-				
-		vec16F_clusterizer::array_of_weighted_training_vecs training_vecs(m_total_blocks);
-				
-		const uint32_t N = 4096;
+		vec16F_clusterizer selector_clusterizer;
+
+		const uint32_t N = 4096; // batch size
 		for (uint32_t block_index_iter = 0; block_index_iter < m_total_blocks; block_index_iter += N)
 		{
 			const uint32_t first_index = block_index_iter;
 			const uint32_t last_index = minimum<uint32_t>(m_total_blocks, first_index + N);
 
-			m_params.m_pJob_pool->add_job( [this, first_index, last_index, &training_vecs] {
+			for (uint32_t block_index = first_index; block_index < last_index; block_index++)
+			{
+				const etc_block &blk = m_encoded_blocks[block_index];
 
-				for (uint32_t block_index = first_index; block_index < last_index; block_index++)
-				{
-					const etc_block &blk = m_encoded_blocks[block_index];
+				vec16F v;
+				for (uint32_t y = 0; y < 4; y++)
+					for (uint32_t x = 0; x < 4; x++)
+						v[x + y * 4] = static_cast<float>(blk.get_selector(x, y));
 
-					vec16F v;
-					for (uint32_t y = 0; y < 4; y++)
-						for (uint32_t x = 0; x < 4; x++)
-							v[x + y * 4] = static_cast<float>(blk.get_selector(x, y));
+				const uint32_t subblock_index = (blk.get_inten_table(0) > blk.get_inten_table(1)) ? 0 : 1;
 
-					const uint32_t subblock_index = (blk.get_inten_table(0) > blk.get_inten_table(1)) ? 0 : 1;
+				color_rgba block_colors[2];
+				blk.get_block_low_high_colors(block_colors, subblock_index);
 
-					color_rgba block_colors[2];
-					blk.get_block_low_high_colors(block_colors, subblock_index);
+				const uint32_t dist = color_distance(m_params.m_perceptual, block_colors[0], block_colors[1], false);
 
-					const uint32_t dist = color_distance(m_params.m_perceptual, block_colors[0], block_colors[1], false);
+				const uint32_t cColorDistToWeight = 300;
+				const uint32_t cMaxWeight = 4096;
+				uint32_t weight = clamp<uint32_t>(dist / cColorDistToWeight, 1, cMaxWeight);
 
-					const uint32_t cColorDistToWeight = 300;
-					const uint32_t cMaxWeight = 4096;
-					uint32_t weight = clamp<uint32_t>(dist / cColorDistToWeight, 1, cMaxWeight);
-						
-					training_vecs[block_index].first = v;
-					training_vecs[block_index].second = weight;
-				
-				} // block_index
-
-			} );
-
+				selector_clusterizer.add_training_vec(v, weight);
+			} // block_index
 		} // block_index_iter
-
-		m_params.m_pJob_pool->wait_for_all();
-
-		vec16F_clusterizer selector_clusterizer;
-		for (uint32_t i = 0; i < m_total_blocks; i++)
-			selector_clusterizer.add_training_vec(training_vecs[i].first, training_vecs[i].second);
 
 		const int selector_parent_codebook_size = (m_params.m_compression_level <= 1) ? BASISU_SELECTOR_PARENT_CODEBOOK_SIZE_COMP_LEVEL_01 : BASISU_SELECTOR_PARENT_CODEBOOK_SIZE_COMP_LEVEL_DEFAULT;
 		const uint32_t parent_codebook_size = (m_params.m_max_selector_clusters >= 256) ? selector_parent_codebook_size : 0;
