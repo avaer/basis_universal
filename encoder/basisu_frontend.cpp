@@ -1488,7 +1488,7 @@ namespace basisu
 				const uint32_t first_index = cluster_index_iter;
 				const uint32_t last_index = minimum<uint32_t>((uint32_t)m_endpoint_clusters.size(), cluster_index_iter + N);
 
-				m_params.m_pJob_pool->add_job([this, first_index, last_index, step, kMaxPixelsPerCluster] {
+				m_params.m_pJob_pool->add_job([this, first_index, last_index, step] {
 
 					for (uint32_t cluster_index = first_index; cluster_index < last_index; cluster_index++)
 					{
