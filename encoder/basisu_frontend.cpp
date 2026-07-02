@@ -1480,8 +1480,10 @@ namespace basisu
 
 		if (use_cpu)
 		{
-			// Always cap per-cluster pixels to keep peak memory bounded
-			const uint32_t kMaxPixelsPerCluster = 65536;
+			// Always cap per-cluster pixels to keep peak memory bounded.
+			// static so the lambdas below can read it without capturing it
+			// (MSVC rejects the capture-free read of a non-static local).
+			static constexpr uint32_t kMaxPixelsPerCluster = 65536;
 			const uint32_t N = 128;
 			for (uint32_t cluster_index_iter = 0; cluster_index_iter < m_endpoint_clusters.size(); cluster_index_iter += N)
 			{
